@@ -39,6 +39,12 @@
       "url": "${hosts:zope6}"
     },
     {
+      "title": "${sites:zope7}",
+      "type": "plone",
+      "port": "${ports:zope7}",
+      "url": "${hosts:zope7}"
+    },
+    {
       "title": "${sites:static1}",
       "type": "static",
       "port": "80",
