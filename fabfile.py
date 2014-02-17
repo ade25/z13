@@ -80,7 +80,7 @@ def prepare_deploy():
 @task
 def deploy():
     """ Deploy current master to production server """
-    push()
+    prepare_deploy()
     controls.update()
     controls.build()
 
@@ -88,7 +88,6 @@ def deploy():
 @task
 def deploy_site():
     """ Deploy a new site to production """
-    push()
     controls.update()
     controls.build()
     controls.reload_supervisor()
