@@ -1,6 +1,9 @@
 {
-  "server": "6zu1",
+  "server": "z13",
   "servername": "${hosts:public}",
+  "nginx": "1.5.8",
+  "varnish": "3.0.5",
+  "haproxy": "1.5-dev21",
   "sites": [
     {
       "title": "${sites:zope1}",
