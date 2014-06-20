@@ -19,7 +19,7 @@ env.webserver = '/opt/webserver/buildout.webserver'
 env.code_root = '/opt/webserver/buildout.webserver'
 env.host_root = '/opt/sites'
 
-env.hosts = ['6zu1']
+env.hosts = ['z13']
 env.hosted_sites = [
     'kh',
     'kipungani',
