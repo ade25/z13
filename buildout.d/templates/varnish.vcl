@@ -105,6 +105,12 @@ sub vcl_backend_response {
 
 sub vcl_deliver {
     call rewrite_age;
+    set resp.http.grace = req.http.grace;
+}
+
+sub vcl_backend_response {
+    set beresp.ttl = 10s;
+    set beresp.grace = 1h;
 }
 
 ##########################
