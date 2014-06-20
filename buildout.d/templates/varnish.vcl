@@ -1,13 +1,6 @@
-# VCL file optimized for plone.app.caching.  See vcl(7) for details
+vcl 4.0;
 
-# This is an example of a split view caching setup with another proxy
-# like Apache in front of Varnish to rewrite urls into the VHM style.
-
-# Also assumes a single backend behind Varnish (which could be a single
-# zope instance or a load balancer serving multiple zeo clients).
-# To change this to support multiple backends, see the vcl man pages
-# for instructions.
-
+import std;
 
 # Configure balancer server as back end
 backend balancer {
@@ -23,85 +16,57 @@ acl purge {
     "${hosts:allow-purge}";
 }
 
-sub vcl_hit {
-  if (obj.ttl >= 0s) {
-    # normal hit
-    return (deliver);
-  }
-  # We have no fresh fish. Lets look at the stale ones.
-  if (std.healthy(req.backend_hint)) {
-    # Backend is healthy. Limit age to 10s.
-    if (obj.ttl + 10s > 0s) {
-      set req.http.grace = "normal(limited)";
-      return (deliver);
-    } else {
-      # No candidate for grace. Fetch a fresh object.
-      return(fetch);
-   }
-  } else {
-    # backend is sick - use full grace
-    if (obj.ttl + obj.grace > 0s) {
-      set req.http.grace = "full";
-      return (deliver);
-    } else {
-     # no graced object.
-    return (fetch);
-   }
-  }
-}
-
 sub vcl_recv {
-    set req.grace = 10m;
-    set req.backend = balancer;
+    set req.backend_hint = balancer;
 
-    if (client.ip ~ purge && req.http.X-Forwarded-For) {
-        set req.http.X-Forwarded-For = req.http.X-Forwarded-For;
-    } else {
-        set req.http.X-Forwarded-For = regsub(client.ip, ":.*", "");
-    }
-    if (req.request == "PURGE") {
+    if (req.method == "PURGE") {
         if (!client.ip ~ purge) {
-                error 405 "Not allowed.";
+            return(synth(405, "Not allowed."));
         }
-        ban_url(req.url);
-        error 200 "Purged";
+        ban("req.http.host == " + req.http.host +
+                      "&& req.url == " + req.url);
+        return(synth(200, "Ban added"));
     }
-    if (req.request != "GET" && req.request != "HEAD") {
+    if (req.method != "GET" && req.method != "HEAD") {
         # We only deal with GET and HEAD by default
         return(pass);
     }
-    if (req.http.host ~ "^(.*\.)?coraggio\.de$") {
+    if (req.http.host ~ "^(.*\.)?coraggio\.de$" || req.http.host ~ "^(.*\.)?kreativkombinat.de$") {
         # We do not cache sites in development
         return(pass);
     }
     call normalize_accept_encoding;
     call annotate_request;
-    return(lookup);
+    return(hash);
 }
 
-sub vcl_pipe {
-    set bereq.http.connection = "close";
-    return(pipe);
-}
-
-sub vcl_fetch {
+sub vcl_backend_response {
+    set beresp.grace = 30m;
     if (!beresp.ttl > 0s) {
         set beresp.http.X-Varnish-Action = "FETCH (pass - not cacheable)";
-        return(hit_for_pass);
+        set beresp.uncacheable = true;
+        set beresp.ttl = 120s;
+        return (deliver);
     }
     if (beresp.http.Set-Cookie) {
         set beresp.http.X-Varnish-Action = "FETCH (pass - response sets cookie)";
-        return(hit_for_pass);
+        set beresp.uncacheable = true;
+        set beresp.ttl = 120s;
+        return (deliver);
     }
     if (!beresp.http.Cache-Control ~ "s-maxage=[1-9]" && beresp.http.Cache-Control ~ "(private|no-cache|no-store)") {
         set beresp.http.X-Varnish-Action = "FETCH (pass - response sets private/no-cache/no-store token)";
-        return(hit_for_pass);
+        set beresp.uncacheable = true;
+        set beresp.ttl = 120s;
+        return (deliver);
     }
-    if (!req.http.X-Anonymous && !beresp.http.Cache-Control ~ "public") {
+    if (!bereq.http.X-Anonymous && !beresp.http.Cache-Control ~ "public") {
         set beresp.http.X-Varnish-Action = "FETCH (pass - authorized and no public cache control)";
-        return(hit_for_pass);
+        set beresp.uncacheable = true;
+        set beresp.ttl = 120s;
+        return (deliver);
     }
-    if (req.http.X-Anonymous && !beresp.http.Cache-Control) {
+    if (bereq.http.X-Anonymous && !beresp.http.Cache-Control) {
         set beresp.ttl = 10s;
         set beresp.http.X-Varnish-Action = "FETCH (override - backend not setting cache control)";
     } else {
@@ -113,7 +78,6 @@ sub vcl_fetch {
 
 sub vcl_deliver {
     call rewrite_age;
-    set resp.http.grace = req.http.grace;
 }
 
 ##########################
@@ -124,11 +88,11 @@ sub vcl_deliver {
 sub normalize_accept_encoding {
     if (req.http.Accept-Encoding) {
         if (req.url ~ "\.(jpe?g|png|gif|swf|pdf|gz|tgz|bz2|tbz|zip)$" || req.url ~ "/image_[^/]*$") {
-            remove req.http.Accept-Encoding;
+            unset req.http.Accept-Encoding;
         } elsif (req.http.Accept-Encoding ~ "gzip") {
             set req.http.Accept-Encoding = "gzip";
         } else {
-            remove req.http.Accept-Encoding;
+            unset req.http.Accept-Encoding;
         }
     }
 }
