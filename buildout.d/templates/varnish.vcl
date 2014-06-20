@@ -45,6 +45,7 @@ sub vcl_hit {
 
 sub vcl_recv {
     set req.backend_hint = balancer;
+    set req.http.grace = "none";
 
     if (req.method == "PURGE") {
         if (!client.ip ~ purge) {
