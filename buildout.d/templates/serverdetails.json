@@ -16,12 +16,6 @@
       "type": "plone",
       "port": "${ports:zope3}",
       "url": "${hosts:zope3}"
-    },
-    {
-      "title": "${sites:zope5}",
-      "type": "plone",
-      "port": "${ports:zope5}",
-      "url": "${hosts:zope5}"
     }
   ]
 }
